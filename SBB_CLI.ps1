@@ -8,8 +8,6 @@
     Write-Host "5 = Custom Station"
     Write-Host "~~~~~~~~~~~~~~~~~~~~~~"
 
-    # $proxyUrl = "http://p-proxy-inf.swi.srse.net:8080"
-
     $stationChoice = Read-Host "Your choice (1-5)"
     switch ($stationChoice) {
         "1" { $station = "Zürich Flughafen"; $mode = "station" }
@@ -27,7 +25,7 @@
     $limit = 10
     $url = "https://transport.opendata.ch/v1/stationboard?station=$([uri]::EscapeDataString($station))&limit=$limit"
     try {
-        $response = Invoke-RestMethod -Uri $url -Method Get # -Proxy $proxyUrl -ProxyUseDefaultCredentials
+        $response = Invoke-RestMethod -Uri $url -Method Get
     } catch {
         Write-Host "Invalid station or API error."
         return
@@ -67,7 +65,6 @@
 }
 
 function Show-TravelToHome {
-    # $proxyUrl = "http://p-proxy-inf.swi.srse.net:8080"
     $from = "Glattpark"
     $to = "Andelfingen"
     $fromEsc = [uri]::EscapeDataString($from)
@@ -76,7 +73,7 @@ function Show-TravelToHome {
     $currentIndex = 0
 
     $url = "https://transport.opendata.ch/v1/connections?from=$fromEsc&to=$toEsc&limit=$limit"
-    $response = Invoke-RestMethod -Uri $url # -Proxy $proxyUrl -ProxyUseDefaultCredentials
+    $response = Invoke-RestMethod -Uri $url
     $connections = $response.connections
 
     if (-not $connections) {
@@ -150,11 +147,10 @@ function Show-CustomPlanner {
     $toEsc   = [uri]::EscapeDataString($dest)
     $limit   = 5
     $currentIndex = 0
-    # $proxyUrl = "http://p-proxy-inf.swi.srse.net:8080"
 
     $url = "https://transport.opendata.ch/v1/connections?from=$fromEsc&to=$toEsc&limit=$limit"
     try {
-        $response = Invoke-RestMethod -Uri $url # -Proxy $proxyUrl -ProxyUseDefaultCredentials
+        $response = Invoke-RestMethod -Uri $url
         $connections = $response.connections
     } catch {
         Write-Host "Invalid departure or destination."
@@ -230,8 +226,6 @@ function WeatherForecast {
 
     $encodedCity = [uri]::EscapeDataString($city)
 
-    # $proxyUrl = "http://p-proxy-inf.swi.srse.net:8080"
-
     $url = "https://nominatim.openstreetmap.org/search?city=$encodedCity&countrycodes=ch&format=json&limit=1"
 
     $response = Invoke-RestMethod -Uri $url -Method Get -Headers @{ "User-Agent" = "MyPSWeatherApp" }
@@ -249,7 +243,7 @@ function WeatherForecast {
 
     $weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=temperature_2m,precipitation,windspeed_10m" 
 
-    $weatherResponse = Invoke-RestMethod -Uri $weatherUrl -Method Get # -Proxy $proxyUrl -ProxyUseDefaultCredentials
+    $weatherResponse = Invoke-RestMethod -Uri $weatherUrl -Method Get
 
     $now = Get-Date
     $roundedHour = Get-Date -Year $now.Year -Month $now.Month -Day $now.Day -Hour $now.Hour -Minute 0 -Second 0
