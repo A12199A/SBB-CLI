@@ -10,14 +10,13 @@
 
     $stationChoice = Read-Host "Your choice (1-5)"
     switch ($stationChoice) {
-        "1" { $station = "Zürich Flughafen"; $mode = "station" }
-        "2" { $station = "Andelfingen"; $mode = "station" }
-        "3" { $station = "Zürich HB"; $mode = "station" }
-        "4" { $station = "Winterthur"; $mode = "station" }
+        "1" { $station = "Zürich Flughafen" }
+        "2" { $station = "Andelfingen" }
+        "3" { $station = "Zürich HB" }
+        "4" { $station = "Winterthur" }
         "5" { 
             Write-Host "Enter station name:"
             $station = Read-Host
-            $mode = "station"
         }
         default { Write-Host "Invalid selection"; return }
     }
@@ -46,9 +45,9 @@
 
         if ($_.stop.cancelled -eq $true) {
             $status = "Cancelled"
-        } elseif ($_.stop.prognosis.platform -and $_.stop.prognosis.platform -ne $_.stop.platform) {
+        } elseif ($null -ne $_.stop.prognosis.platform -and $_.stop.prognosis.platform -ne $_.stop.platform) {
             $status = "Platform changed to " + $_.stop.prognosis.platform
-        } elseif ($_.stop.delay -ne $null -and $_.stop.delay -gt 0) {
+        } elseif ($null -ne $_.stop.delay -and $_.stop.delay -gt 0) {
             $status = "+" + $_.stop.delay + " min"
         } else {
             $status = "OK"
@@ -64,91 +63,23 @@
     } | Format-Table -AutoSize
 }
 
-function Show-TravelToHome {
-    $from = "Glattpark"
-    $to = "Andelfingen"
-    $fromEsc = [uri]::EscapeDataString($from)
-    $toEsc   = [uri]::EscapeDataString($to)
+
+# ============================================================
+# Unified function used for BOTH Travel Home + Custom Planner
+# ============================================================
+function Show-Connections {
+    param(
+        [string]$From,
+        [string]$To
+    )
+
+    $fromEsc = [uri]::EscapeDataString($From)
+    $toEsc   = [uri]::EscapeDataString($To)
     $limit   = 5
     $currentIndex = 0
 
     $url = "https://transport.opendata.ch/v1/connections?from=$fromEsc&to=$toEsc&limit=$limit"
-    $response = Invoke-RestMethod -Uri $url
-    $connections = $response.connections
 
-    if (-not $connections) {
-        Write-Host "No connections found."
-        return
-    }
-
-    do {
-        if ($currentIndex -ge $connections.Count) {
-            Write-Host "`nNo more connections."
-            break
-        }
-
-        $conn = $connections[$currentIndex]
-        $duration = [System.TimeSpan]::Parse($conn.duration.Replace("00d",""))
-        Write-Host "`n=== Connection $($currentIndex+1) " -NoNewline
-        Write-Host "(Duration: $($duration.Hours)h $($duration.Minutes)m)" -ForegroundColor Cyan -NoNewline
-        Write-Host " ===`n"
-
-        $conn.sections | ForEach-Object {
-            if (-not $_.journey) { return }
-
-            $departure = (Get-Date $_.departure.departure).ToLocalTime().ToString("HH:mm")
-            $arrival   = (Get-Date $_.arrival.arrival).ToLocalTime().ToString("HH:mm")
-            $fromStop  = $_.departure.station.name
-            $toStop    = $_.arrival.station.name
-            $line      = $_.journey.category + $_.journey.number
-
-            $departurePlatform = if ($_.departure.platform) { $_.departure.platform } else { "-" }
-            $arrivalPlatform   = if ($_.arrival.platform) { $_.arrival.platform } else { "-" }
-
-            if ($_.departure.cancelled -eq $true) {
-                $status = "Cancelled"
-            } elseif ($_.departure.delay -gt 0) {
-                $status = "+" + $_.departure.delay + " min"
-            } elseif ($_.departure.prognosis.platform -and $_.departure.prognosis.platform -ne $_.departure.platform) {
-                $status = "Platform changed to " + $_.departure.prognosis.platform
-            } else {
-                $status = "OK"
-            }
-
-            [PSCustomObject]@{
-                From               = $fromStop
-                To                 = $toStop
-                Line               = $line
-                Departure          = $departure
-                DeparturePlatform  = $departurePlatform
-                Arrival            = $arrival
-                ArrivalPlatform    = $arrivalPlatform
-                Status             = $status
-            }
-        } | Format-Table -AutoSize
-
-        Write-Host "`n1 = Exit, 2 = Load next connection"
-        $choiceNext = Read-Host "Your choice"
-        if ($choiceNext -eq "2") {
-            $currentIndex++
-        } else {
-            break
-        }
-
-    } while ($true)
-}
-
-function Show-CustomPlanner {
-    Write-Host "Enter Departure Station:"
-    $dep = Read-Host
-    Write-Host "Enter Destination Station:"
-    $dest = Read-Host
-    $fromEsc = [uri]::EscapeDataString($dep)
-    $toEsc   = [uri]::EscapeDataString($dest)
-    $limit   = 5
-    $currentIndex = 0
-
-    $url = "https://transport.opendata.ch/v1/connections?from=$fromEsc&to=$toEsc&limit=$limit"
     try {
         $response = Invoke-RestMethod -Uri $url
         $connections = $response.connections
@@ -219,6 +150,27 @@ function Show-CustomPlanner {
     } while ($true)
 }
 
+
+# Travel to Home — now uses the new unified function
+function Show-TravelToHome {
+    Show-Connections -From "Glattpark" -To "Andelfingen"
+}
+
+# Custom Planner — also uses the unified function
+function Show-CustomPlanner {
+    Write-Host "Enter Departure Station:"
+    $dep = Read-Host
+    Write-Host "Enter Destination Station:"
+    $dest = Read-Host
+
+    Show-Connections -From $dep -To $dest
+}
+
+
+# =====================
+# Weather API
+# =====================
+
 function WeatherForecast {
     param (
         [string]$city = $(Read-Host "Please enter your City")
@@ -278,6 +230,11 @@ function WeatherForecast {
     $forecast | Format-Table -AutoSize
 }
 
+
+# =====================
+# MAIN MENU
+# =====================
+
 do {
     Write-Host "====================="
     Write-Host "       SBB CLI" -ForegroundColor Red
@@ -301,10 +258,10 @@ do {
         "6" { 
             Clear-Host
             Write-Host "SBB-CLI"
-            Write-Host "Version 3.20"
+            Write-Host "Version 3.30"
             Write-Host "Environment: Powershell"
             Write-Host "(C) Aaron Frehner"
-             }
+        }
         default { Write-Host "Invalid choice, please select 1-5" }
     }
 
