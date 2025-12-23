@@ -63,6 +63,7 @@
     } | Format-Table -AutoSize
 }
 
+$global:EasterEggBestTries = $null
 
 # ============================================================
 # Unified function used for BOTH Travel Home + Custom Planner
@@ -163,6 +164,11 @@ function Show-CustomPlanner {
     Write-Host "Enter Destination Station:"
     $dest = Read-Host
 
+    if ($dep.Trim().ToLower() -eq $dest.Trim().ToLower()) {
+        Start-EasterEggGame
+        return
+    }
+
     Show-Connections -From $dep -To $dest
 }
 
@@ -230,6 +236,51 @@ function WeatherForecast {
     $forecast | Format-Table -AutoSize
 }
 
+function Start-EasterEggGame {
+    Write-Host "`n=== Easter Egg: Guess the Number ===" -ForegroundColor Cyan
+    Write-Host "I picked a number between 1 and 20."
+    Write-Host "Type 'q' to quit."
+    Write-Host "Type 'r' to reset high score.`n"
+
+    $secret = Get-Random -Minimum 1 -Maximum 21
+    $tries = 0
+
+    while ($true) {
+        $guess = Read-Host "Your guess"
+
+        if ($guess -eq "q") {
+            Write-Host "Leaving the game. The number was $secret."
+            break
+        }
+        if ($guess -eq "r") {
+            $global:EasterEggBestTries = $null
+            Write-Host "High score reset."
+            continue
+        }
+
+        $num = 0
+        $ok = [int]::TryParse($guess, [ref]$num)
+        if (-not $ok) {
+            Write-Host "Please enter a number between 1 and 20, or 'q'."
+            continue
+        }
+
+        $tries++
+        if ($num -lt $secret) {
+            Write-Host "Too low."
+        } elseif ($num -gt $secret) {
+            Write-Host "Too high."
+        } else {
+            Write-Host "Correct! You needed $tries tries."
+            if ($null -eq $global:EasterEggBestTries -or $tries -lt $global:EasterEggBestTries) {
+                $global:EasterEggBestTries = $tries
+                Write-Host "New best score!"
+            }
+            break
+        }
+    }
+}
+
 
 # =====================
 # MAIN MENU
@@ -261,6 +312,9 @@ do {
             Write-Host "Version 3.30"
             Write-Host "Environment: Powershell"
             Write-Host "(C) Aaron Frehner"
+            if ($null -ne $global:EasterEggBestTries) {
+                Write-Host "Easter Egg Best Score: $global:EasterEggBestTries tries"
+            }
         }
         default { Write-Host "Invalid choice, please select 1-5" }
     }
