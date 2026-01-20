@@ -21,6 +21,7 @@
         default { Write-Host "Invalid selection"; return }
     }
 
+    # Build stationboard API request
     $limit = 10
     $url = "https://transport.opendata.ch/v1/stationboard?station=$([uri]::EscapeDataString($station))&limit=$limit"
     try {
@@ -35,6 +36,7 @@
         return
     }
 
+    # Map API response to a readable table
     $response.stationboard | ForEach-Object {
         if ($_.category -notmatch '^(S|R|IC|IR|EC|ICN|TGV|ICE|RE)$') { return }
 
@@ -43,6 +45,7 @@
         $time = (Get-Date $_.stop.departure).ToLocalTime().ToString("HH:mm")
         $platform = if ($_.stop.platform) { $_.stop.platform } else { "-" }
 
+        # Derive status with priority: cancelled > platform change > delay
         if ($_.stop.cancelled -eq $true) {
             $status = "Cancelled"
         } elseif ($null -ne $_.stop.prognosis.platform -and $_.stop.prognosis.platform -ne $_.stop.platform) {
@@ -63,7 +66,7 @@
     } | Format-Table -AutoSize
 }
 
-$global:EasterEggBestTries = $null
+$global:EasterEggBestTries = $null  # Best score across sessions in this run
 
 # ============================================================
 # Unified function used for BOTH Travel Home + Custom Planner
@@ -74,6 +77,7 @@ function Show-Connections {
         [string]$To
     )
 
+    # Encode stations for safe URL usage
     $fromEsc = [uri]::EscapeDataString($From)
     $toEsc   = [uri]::EscapeDataString($To)
     $limit   = 5
@@ -94,6 +98,7 @@ function Show-Connections {
         return
     }
 
+    # Allow paging through multiple connections
     do {
         if ($currentIndex -ge $connections.Count) {
             Write-Host "`nNo more connections."
@@ -106,6 +111,7 @@ function Show-Connections {
         Write-Host "(Duration: $($duration.Hours)h $($duration.Minutes)m)" -ForegroundColor Cyan -NoNewline
         Write-Host " ===`n"
 
+        # Each section represents a segment of the journey
         $conn.sections | ForEach-Object {
             if (-not $_.journey) { return }
 
@@ -118,6 +124,7 @@ function Show-Connections {
             $departurePlatform = if ($_.departure.platform) { $_.departure.platform } else { "-" }
             $arrivalPlatform   = if ($_.arrival.platform) { $_.arrival.platform } else { "-" }
 
+            # Derive section status with priority: cancelled > delay > platform change
             if ($_.departure.cancelled -eq $true) {
                 $status = "Cancelled"
             } elseif ($_.departure.delay -gt 0) {
@@ -164,6 +171,7 @@ function Show-CustomPlanner {
     Write-Host "Enter Destination Station:"
     $dest = Read-Host
 
+    # Hidden Easter egg if user enters same station twice
     if ($dep.Trim().ToLower() -eq $dest.Trim().ToLower()) {
         Start-EasterEggGame
         return
@@ -186,6 +194,7 @@ function WeatherForecast {
 
     $url = "https://nominatim.openstreetmap.org/search?city=$encodedCity&countrycodes=ch&format=json&limit=1"
 
+    # Resolve city to coordinates (Nominatim)
     $response = Invoke-RestMethod -Uri $url -Method Get -Headers @{ "User-Agent" = "MyPSWeatherApp" }
 
     if (-not $response) {
@@ -201,11 +210,13 @@ function WeatherForecast {
 
     $weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=temperature_2m,precipitation,windspeed_10m" 
 
+    # Fetch hourly weather data (Open-Meteo)
     $weatherResponse = Invoke-RestMethod -Uri $weatherUrl -Method Get
 
     $now = Get-Date
     $roundedHour = Get-Date -Year $now.Year -Month $now.Month -Day $now.Day -Hour $now.Hour -Minute 0 -Second 0
 
+    # Find the first hour at or after current time
     $startIndex = 0
     for ($j=0; $j -lt $weatherResponse.hourly.time.Count; $j++) {
         $t = Get-Date $weatherResponse.hourly.time[$j]
@@ -217,6 +228,7 @@ function WeatherForecast {
 
     $forecast = @()
 
+    # Build a short forecast window (next 5 hours)
     for ($i = $startIndex; $i -lt ($startIndex + 5); $i++) {
         $dt   = Get-Date $weatherResponse.hourly.time[$i]
         $temp = $weatherResponse.hourly.temperature_2m[$i]
@@ -242,6 +254,7 @@ function Start-EasterEggGame {
     Write-Host "Type 'q' to quit."
     Write-Host "Type 'r' to reset high score.`n"
 
+    # Random number for the guessing game
     $secret = Get-Random -Minimum 1 -Maximum 21
     $tries = 0
 
@@ -272,6 +285,7 @@ function Start-EasterEggGame {
             Write-Host "Too high."
         } else {
             Write-Host "Correct! You needed $tries tries."
+            # Track best score for the current session
             if ($null -eq $global:EasterEggBestTries -or $tries -lt $global:EasterEggBestTries) {
                 $global:EasterEggBestTries = $tries
                 Write-Host "New best score!"

@@ -13,6 +13,7 @@ function Get-DepartureBoardData {
         throw 'Station is required.'
     }
 
+    # Build stationboard API request
     $url = "https://transport.opendata.ch/v1/stationboard?station=$([uri]::EscapeDataString($Station))&limit=$Limit"
     $response = Invoke-RestMethod -Uri $url -Method Get
 
@@ -20,6 +21,7 @@ function Get-DepartureBoardData {
         return @()
     }
 
+    # Map API response to a compact table-friendly object
     $response.stationboard | ForEach-Object {
         if ($_.category -notmatch '^(S|R|IC|IR|EC|ICN|TGV|ICE|RE)$') { return }
 
@@ -27,6 +29,7 @@ function Get-DepartureBoardData {
         $time = (Get-Date $_.stop.departure).ToLocalTime().ToString('HH:mm')
         $platform = if ($_.stop.platform) { $_.stop.platform } else { '-' }
 
+        # Derive status with priority: cancelled > platform change > delay
         if ($_.stop.cancelled -eq $true) {
             $status = 'Cancelled'
         } elseif ($null -ne $_.stop.prognosis.platform -and $_.stop.prognosis.platform -ne $_.stop.platform) {
@@ -60,6 +63,7 @@ function Get-ConnectionsData {
 
     $fromEsc = [uri]::EscapeDataString($From)
     $toEsc   = [uri]::EscapeDataString($To)
+    # Build connections API request
     $url = "https://transport.opendata.ch/v1/connections?from=$fromEsc&to=$toEsc&limit=$Limit"
 
     $response = Invoke-RestMethod -Uri $url
@@ -67,6 +71,7 @@ function Get-ConnectionsData {
         return @()
     }
 
+    # Each connection contains multiple sections
     $response.connections | ForEach-Object {
         $duration = [System.TimeSpan]::Parse($_.duration.Replace('00d',''))
         $sections = @()
@@ -81,6 +86,7 @@ function Get-ConnectionsData {
             $departurePlatform = if ($_.departure.platform) { $_.departure.platform } else { '-' }
             $arrivalPlatform   = if ($_.arrival.platform) { $_.arrival.platform } else { '-' }
 
+            # Derive section status with priority: cancelled > delay > platform change
             if ($_.departure.cancelled -eq $true) {
                 $status = 'Cancelled'
             } elseif ($_.departure.delay -gt 0) {
@@ -121,6 +127,7 @@ function Get-WeatherData {
 
     $encodedCity = [uri]::EscapeDataString($City)
     $locUrl = "https://nominatim.openstreetmap.org/search?city=$encodedCity&countrycodes=ch&format=json&limit=1"
+    # Resolve city name to coordinates (Nominatim)
     $loc = Invoke-RestMethod -Uri $locUrl -Method Get -Headers @{ 'User-Agent' = 'MyPSWeatherApp' }
 
     if (-not $loc) {
@@ -130,11 +137,13 @@ function Get-WeatherData {
     $lat = $loc[0].lat
     $lon = $loc[0].lon
     $weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=temperature_2m,precipitation,windspeed_10m"
+    # Fetch hourly weather data (Open-Meteo)
     $weather = Invoke-RestMethod -Uri $weatherUrl -Method Get
 
     $now = Get-Date
     $roundedHour = Get-Date -Year $now.Year -Month $now.Month -Day $now.Day -Hour $now.Hour -Minute 0 -Second 0
 
+    # Find the first hour at or after current time
     $startIndex = 0
     for ($j = 0; $j -lt $weather.hourly.time.Count; $j++) {
         $t = Get-Date $weather.hourly.time[$j]
@@ -144,6 +153,7 @@ function Get-WeatherData {
         }
     }
 
+    # Build a short forecast window (next 5 hours)
     $forecast = @()
     for ($i = $startIndex; $i -lt ($startIndex + 5); $i++) {
         $dt   = Get-Date $weather.hourly.time[$i]
@@ -171,6 +181,7 @@ function Send-Json {
 
     $Response.StatusCode = $StatusCode
     $Response.ContentType = 'application/json; charset=utf-8'
+    # Consistent JSON serialization for API responses
     $json = $Data | ConvertTo-Json -Depth 8
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
     $Response.ContentLength64 = $bytes.Length
@@ -276,6 +287,7 @@ const easterEgg = {
 };
 
 function resetEasterEgg(){
+  // New random number and reset tries
   easterEgg.secret = Math.floor(Math.random() * 20) + 1;
   easterEgg.tries = 0;
   renderEasterEgg('New game started. Pick a number between 1 and 20.');
@@ -296,6 +308,7 @@ function updateBest(tries){
 }
 
 function renderEasterEgg(message){
+  // Render the game UI in the Connections card
   const best = bestTries();
   const bestLine = best !== null ? `<div class="small">Best score: ${best} tries</div>` : '';
   el('connections').innerHTML = `
@@ -311,6 +324,7 @@ function renderEasterEgg(message){
 }
 
 function submitEasterEgg(){
+  // Validate and compare guess
   const input = el('eggGuess');
   const guess = parseInt((input.value || '').trim(), 10);
   if (Number.isNaN(guess) || guess < 1 || guess > 20){
@@ -344,6 +358,7 @@ function renderTable(rows){
 }
 
 function openInfo(){
+  // Mirror the CLI "About" info in a modal
   const best = bestTries();
   el('bestScoreInfo').textContent = best !== null ? `Easter Egg Best Score: ${best} tries` : '';
   el('infoModal').style.display = 'flex';
@@ -366,6 +381,7 @@ async function loadConnections(){
   const from = el('from').value.trim();
   const to = el('to').value.trim();
   if (from.toLowerCase() === to.toLowerCase()){
+    // Trigger Easter egg if same station is entered twice
     if (easterEgg.secret === null){
       resetEasterEgg();
     } else {
@@ -397,7 +413,7 @@ async function loadWeather(){
 </html>
 '@
 
-$portCandidates = 8085..8095
+$portCandidates = 8085..8095  # Fallback range if 8085 is taken
 $listener = $null
 $prefix = $null
 foreach ($p in $portCandidates) {
@@ -423,6 +439,7 @@ Write-Host 'Press Ctrl+C to stop.'
 $script:ShouldStop = $false
 $cancelSub = $null
 try {
+    # Handle Ctrl+C cleanly across hosts
     $cancelSub = Register-ObjectEvent -InputObject ([System.Console]) -EventName CancelKeyPress -Action {
         $script:ShouldStop = $true
         $EventArgs.Cancel = $true
@@ -438,6 +455,7 @@ try {
     while ($listener.IsListening -and -not $script:ShouldStop) {
         $asyncResult = $null
         try {
+            # Non-blocking accept so stop events are honored
             $asyncResult = $listener.BeginGetContext($null, $null)
         } catch {
             break
