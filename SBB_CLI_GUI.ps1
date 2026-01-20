@@ -189,7 +189,10 @@ $html = @'
 :root { --bg: #f7f4ef; --ink: #1d1d1d; --card: #ffffff; --accent: #c21f1f; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: "Segoe UI", "Noto Sans", sans-serif; background: var(--bg); color: var(--ink); }
-header { padding: 18px 20px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: 0.5px; }
+header { padding: 18px 20px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between; }
+.header-actions { display: flex; gap: 8px; }
+.info-btn { background: #fff; color: var(--accent); border: 1px solid rgba(255,255,255,0.6); padding: 6px 10px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.info-btn:hover { filter: brightness(0.95); }
 main { padding: 18px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .card { background: var(--card); padding: 16px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
 .card h2 { margin: 0 0 10px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
@@ -201,10 +204,21 @@ pre { background: #f2f2f2; padding: 10px; border-radius: 8px; overflow: auto; }
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 13px; text-align: left; }
 .small { font-size: 12px; color: #666; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; padding: 16px; }
+.modal { background: #fff; border-radius: 12px; max-width: 360px; width: 100%; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
+.modal h3 { margin: 0 0 10px 0; font-size: 16px; }
+.modal p { margin: 4px 0; font-size: 13px; color: #333; }
+.modal .actions { margin-top: 12px; text-align: right; }
+.modal .actions button { width: auto; padding: 6px 12px; }
 </style>
 </head>
 <body>
-<header>SBB CLI - Web GUI (Local)</header>
+<header>
+  <div>SBB CLI - Web GUI (Local)</div>
+  <div class="header-actions">
+    <button class="info-btn" onclick="openInfo()">Info</button>
+  </div>
+</header>
 <main>
   <section class="card">
     <h2>Departure Board</h2>
@@ -240,8 +254,86 @@ pre { background: #f2f2f2; padding: 10px; border-radius: 8px; overflow: auto; }
   </section>
 </main>
 
+<div id="infoModal" class="modal-backdrop" onclick="closeInfo(event)">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>SBB-CLI</h3>
+    <p>Version 3.30</p>
+    <p>Environment: Powershell</p>
+    <p>(C) Aaron Frehner</p>
+    <p id="bestScoreInfo"></p>
+    <div class="actions">
+      <button onclick="closeInfo()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 function el(id){ return document.getElementById(id); }
+const easterEgg = {
+  secret: null,
+  tries: 0,
+  bestKey: 'sbb_cli_easteregg_best'
+};
+
+function resetEasterEgg(){
+  easterEgg.secret = Math.floor(Math.random() * 20) + 1;
+  easterEgg.tries = 0;
+  renderEasterEgg('New game started. Pick a number between 1 and 20.');
+}
+
+function bestTries(){
+  const val = localStorage.getItem(easterEgg.bestKey);
+  return val ? parseInt(val, 10) : null;
+}
+
+function updateBest(tries){
+  const current = bestTries();
+  if (current === null || tries < current){
+    localStorage.setItem(easterEgg.bestKey, String(tries));
+    return true;
+  }
+  return false;
+}
+
+function renderEasterEgg(message){
+  const best = bestTries();
+  const bestLine = best !== null ? `<div class="small">Best score: ${best} tries</div>` : '';
+  el('connections').innerHTML = `
+    <div class="small"><strong>Easter Egg: Guess the Number</strong></div>
+    <div class="small">${message || 'I picked a number between 1 and 20.'}</div>
+    ${bestLine}
+    <label>Guess</label>
+    <input id="eggGuess" placeholder="1-20" />
+    <button onclick="submitEasterEgg()">Submit Guess</button>
+    <button onclick="resetEasterEgg()">New Game</button>
+    <button onclick="clearEasterEggBest()">Reset Best Score</button>
+  `;
+}
+
+function submitEasterEgg(){
+  const input = el('eggGuess');
+  const guess = parseInt((input.value || '').trim(), 10);
+  if (Number.isNaN(guess) || guess < 1 || guess > 20){
+    renderEasterEgg('Please enter a number between 1 and 20.');
+    return;
+  }
+
+  easterEgg.tries += 1;
+  if (guess < easterEgg.secret){
+    renderEasterEgg('Too low.');
+  } else if (guess > easterEgg.secret){
+    renderEasterEgg('Too high.');
+  } else {
+    const newBest = updateBest(easterEgg.tries);
+    const bestMsg = newBest ? ' New best score!' : '';
+    renderEasterEgg(`Correct! You needed ${easterEgg.tries} tries.${bestMsg}`);
+  }
+}
+
+function clearEasterEggBest(){
+  localStorage.removeItem(easterEgg.bestKey);
+  renderEasterEgg('Best score reset.');
+}
 
 function renderTable(rows){
   if (!rows || rows.length === 0) return '<div class="small">No data.</div>';
@@ -249,6 +341,18 @@ function renderTable(rows){
   const head = cols.map(c => `<th>${c}</th>`).join('');
   const body = rows.map(r => `<tr>${cols.map(c => `<td>${r[c]}</td>`).join('')}</tr>`).join('');
   return `<table class="table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function openInfo(){
+  const best = bestTries();
+  el('bestScoreInfo').textContent = best !== null ? `Easter Egg Best Score: ${best} tries` : '';
+  el('infoModal').style.display = 'flex';
+}
+
+function closeInfo(evt){
+  if (!evt || evt.target.id === 'infoModal') {
+    el('infoModal').style.display = 'none';
+  }
 }
 
 async function loadDepartures(){
@@ -261,6 +365,14 @@ async function loadDepartures(){
 async function loadConnections(){
   const from = el('from').value.trim();
   const to = el('to').value.trim();
+  if (from.toLowerCase() === to.toLowerCase()){
+    if (easterEgg.secret === null){
+      resetEasterEgg();
+    } else {
+      renderEasterEgg('I picked a number between 1 and 20.');
+    }
+    return;
+  }
   const res = await fetch(`/api/connections?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   const data = await res.json();
   if (!data || data.length === 0){
@@ -285,16 +397,67 @@ async function loadWeather(){
 </html>
 '@
 
-$listener = [System.Net.HttpListener]::new()
-$prefix = 'http://localhost:8085/'
-$listener.Prefixes.Add($prefix)
-$listener.Start()
+$portCandidates = 8085..8095
+$listener = $null
+$prefix = $null
+foreach ($p in $portCandidates) {
+    $testListener = [System.Net.HttpListener]::new()
+    $testPrefix = "http://localhost:$p/"
+    $testListener.Prefixes.Add($testPrefix)
+    try {
+        $testListener.Start()
+        $listener = $testListener
+        $prefix = $testPrefix
+        break
+    } catch {
+        $testListener.Close()
+    }
+}
+
+if (-not $listener) {
+    throw 'Failed to bind to any port in range 8085-8095.'
+}
+
 Write-Host "SBB CLI GUI running at $prefix"
 Write-Host 'Press Ctrl+C to stop.'
+$script:ShouldStop = $false
+$cancelSub = $null
+try {
+    $cancelSub = Register-ObjectEvent -InputObject ([System.Console]) -EventName CancelKeyPress -Action {
+        $script:ShouldStop = $true
+        $EventArgs.Cancel = $true
+        if ($listener.IsListening) {
+            $listener.Stop()
+        }
+    }
+} catch {
+    Write-Host 'Warning: Ctrl+C handler could not be registered in this host.'
+}
 
 try {
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
+    while ($listener.IsListening -and -not $script:ShouldStop) {
+        $asyncResult = $null
+        try {
+            $asyncResult = $listener.BeginGetContext($null, $null)
+        } catch {
+            break
+        }
+
+        while (-not $asyncResult.AsyncWaitHandle.WaitOne(250)) {
+            if ($script:ShouldStop -or -not $listener.IsListening) {
+                break
+            }
+        }
+
+        if ($script:ShouldStop -or -not $listener.IsListening) {
+            break
+        }
+
+        try {
+            $context = $listener.EndGetContext($asyncResult)
+        } catch {
+            break
+        }
         $req = $context.Request
         $res = $context.Response
 
@@ -347,6 +510,10 @@ try {
     }
 }
 finally {
+    if ($cancelSub) {
+        Unregister-Event -SourceIdentifier $cancelSub.Name
+        $cancelSub = $null
+    }
     $listener.Stop()
     $listener.Close()
 }
