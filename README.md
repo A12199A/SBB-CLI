@@ -46,8 +46,21 @@ git clone https://github.com/A12199A/SBB-CLI.git
 cd SBB-CLI
 ```
 Run the script:
+```powershell
 .\SBB_CLI.ps1
+```
 Use the interactive menu to navigate through the features.
+
+### GUI (Local Web UI)
+
+The repository also includes a lightweight local web GUI.
+
+Run the GUI script:
+```powershell
+.\SBB_CLI_GUI.ps1
+```
+Open your browser at the URL shown in the terminal (default `http://localhost:8085/`).
+If the default port is taken, the script will try the next available port in the range 8085-8095.
 
 
 ## APIs Used
