@@ -323,7 +323,7 @@ do {
         "6" { 
             Clear-Host
             Write-Host "SBB-CLI"
-            Write-Host "Version 3.30"
+            Write-Host "Version 4.10"
             Write-Host "Environment: Powershell"
             Write-Host "(C) Aaron Frehner"
             if ($null -ne $global:EasterEggBestTries) {

@@ -268,7 +268,7 @@ pre { background: #f2f2f2; padding: 10px; border-radius: 8px; overflow: auto; }
 <div id="infoModal" class="modal-backdrop" onclick="closeInfo(event)">
   <div class="modal" role="dialog" aria-modal="true">
     <h3>SBB-CLI</h3>
-    <p>Version 3.30</p>
+    <p>Version 4.10</p>
     <p>Environment: Powershell</p>
     <p>(C) Aaron Frehner</p>
     <p id="bestScoreInfo"></p>
