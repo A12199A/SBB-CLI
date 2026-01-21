@@ -197,12 +197,15 @@ $html = @'
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>SBB CLI GUI</title>
 <style>
-:root { --bg: #f7f4ef; --ink: #1d1d1d; --card: #ffffff; --accent: #c21f1f; }
+:root { --bg: #f7f4ef; --ink: #1d1d1d; --card: #ffffff; --accent: #c21f1f; --muted: #666; --table-border: #eee; --pre-bg: #f2f2f2; --modal-bg: #ffffff; --modal-ink: #1d1d1d; }
+[data-theme="dark"] { --bg: #141414; --ink: #f0f0f0; --card: #1f1f1f; --accent: #e03535; --muted: #b6b6b6; --table-border: #2b2b2b; --pre-bg: #1a1a1a; --modal-bg: #1f1f1f; --modal-ink: #f0f0f0; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: "Segoe UI", "Noto Sans", sans-serif; background: var(--bg); color: var(--ink); }
 header { padding: 18px 20px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between; }
 .header-actions { display: flex; gap: 8px; }
 .info-btn { background: #fff; color: var(--accent); border: 1px solid rgba(255,255,255,0.6); padding: 6px 10px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.theme-btn { background: #fff; color: var(--accent); border: 1px solid rgba(255,255,255,0.6); padding: 6px 10px; border-radius: 8px; font-weight: 700; cursor: pointer; min-width: 40px; }
+.theme-btn:hover { filter: brightness(0.95); }
 .info-btn:hover { filter: brightness(0.95); }
 main { padding: 18px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .card { background: var(--card); padding: 16px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
@@ -211,14 +214,14 @@ label { display: block; font-size: 12px; margin: 8px 0 4px; }
 input, select, button { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; }
 button { background: var(--accent); color: #fff; border: none; cursor: pointer; margin-top: 10px; }
 button:hover { filter: brightness(0.95); }
-pre { background: #f2f2f2; padding: 10px; border-radius: 8px; overflow: auto; }
+pre { background: var(--pre-bg); padding: 10px; border-radius: 8px; overflow: auto; }
 .table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 13px; text-align: left; }
-.small { font-size: 12px; color: #666; }
+.table th, .table td { padding: 6px 8px; border-bottom: 1px solid var(--table-border); font-size: 13px; text-align: left; }
+.small { font-size: 12px; color: var(--muted); }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; padding: 16px; }
-.modal { background: #fff; border-radius: 12px; max-width: 360px; width: 100%; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
+.modal { background: var(--modal-bg); color: var(--modal-ink); border-radius: 12px; max-width: 360px; width: 100%; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
 .modal h3 { margin: 0 0 10px 0; font-size: 16px; }
-.modal p { margin: 4px 0; font-size: 13px; color: #333; }
+.modal p { margin: 4px 0; font-size: 13px; color: var(--modal-ink); }
 .modal .actions { margin-top: 12px; text-align: right; }
 .modal .actions button { width: auto; padding: 6px 12px; }
 </style>
@@ -227,6 +230,7 @@ pre { background: #f2f2f2; padding: 10px; border-radius: 8px; overflow: auto; }
 <header>
   <div>SBB CLI - Web GUI (Local)</div>
   <div class="header-actions">
+    <button id="themeToggle" class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme"></button>
     <button class="info-btn" onclick="openInfo()">Info</button>
   </div>
 </header>
@@ -280,6 +284,7 @@ pre { background: #f2f2f2; padding: 10px; border-radius: 8px; overflow: auto; }
 
 <script>
 function el(id){ return document.getElementById(id); }
+const themeKey = 'sbb_cli_theme';
 const easterEgg = {
   secret: null,
   tries: 0,
@@ -357,6 +362,23 @@ function renderTable(rows){
   return `<table class="table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+function setTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(themeKey, theme);
+  const icon = theme === 'dark' ? '&#9728;' : '&#9789;';
+  el('themeToggle').innerHTML = icon;
+}
+
+function toggleTheme(){
+  const current = localStorage.getItem(themeKey) || 'light';
+  setTheme(current === 'light' ? 'dark' : 'light');
+}
+
+function initTheme(){
+  const saved = localStorage.getItem(themeKey) || 'light';
+  setTheme(saved);
+}
+
 function openInfo(){
   // Mirror the CLI "About" info in a modal
   const best = bestTries();
@@ -408,6 +430,8 @@ async function loadWeather(){
   const data = await res.json();
   el('weather').innerHTML = renderTable(data);
 }
+
+initTheme();
 </script>
 </body>
 </html>
